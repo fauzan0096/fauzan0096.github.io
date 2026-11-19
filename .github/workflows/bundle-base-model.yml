@@ -1,0 +1,84 @@
+# © 2026 F A FS — Bayyin (بيّن). All rights reserved. See LICENSE.
+#
+# Downloads the high-accuracy Quran model (Tarteel tiny/base ONNX exports) into
+# `vendor/bayyin-base/` of THIS repository, so the app loads its "Base" model
+# from its own domain instead of Hugging Face.
+#
+# Run it from the phone: GitHub app → Actions → "Bundle the Base model" →
+# Run workflow. It takes a few minutes and then commits the files here.
+#
+# Why here and not in the app repo: the app repo refuses very large files, and
+# this repo already serves `vendor/ort/` to the app for the same reason.
+
+name: Bundle the Base model
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Download again even if the files already exist'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the model files
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          repo="nael239/tasme3-whisper-base-ar-quran-web"
+          base="https://huggingface.co/${repo}/resolve/main"
+          out="vendor/bayyin-base"
+          mkdir -p "$out/onnx"
+
+          files="
+          config.json
+          generation_config.json
+          preprocessor_config.json
+          tokenizer.json
+          tokenizer_config.json
+          added_tokens.json
+          special_tokens_map.json
+          vocab.json
+          merges.txt
+          normalizer.json
+          onnx/encoder_model_quantized.onnx
+          onnx/decoder_model_merged_quantized.onnx
+          "
+
+          for file in $files; do
+            target="$out/$file"
+            if [ -s "$target" ] && [ "$FORCE" != "true" ]; then
+              echo "already here: $file"
+              continue
+            fi
+            echo "downloading $file"
+            curl -fL --retry 3 --retry-delay 5 -o "$target" "$base/$file"
+          done
+
+          curl -fL --retry 3 -o "$out/LICENSE" \
+            "https://huggingface.co/Sharjeelbaig/whisper-tiny-ar-quran-onnx/resolve/main/LICENSE" \
+            || true
+
+          du -sh "$out"
+
+      - name: Commit what was downloaded
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add vendor/bayyin-base
+          if git diff --cached --quiet; then
+            echo "nothing new"
+            exit 0
+          fi
+          git commit -m "Bundle the Base speech model for the app"
+          git push

@@ -18,3 +18,15 @@ It lives here because the app repository refuses a file this size. `asr.js` and
 `/vendor/ort/`, so the app asks nobody but this domain; the service worker caches
 the `.wasm` after the first check, and the app falls back to its CDN copy if this
 folder is ever missing.
+
+## `vendor/bayyin-base/` — the high-accuracy model
+
+Filled by the workflow **Bundle the Base model** (Actions → Run workflow). It
+downloads the Tarteel base Quran model (Apache-2.0) once and commits it here:
+config + tokenizer files plus `onnx/encoder_model_quantized.onnx` (23 MB) and
+`onnx/decoder_model_merged_quantized.onnx` (80 MB).
+
+After that run the app's "Bayyin Base" model loads from this domain too, and
+Hugging Face is only a fallback. To refresh it later, run the workflow again with
+`force` checked.
+
